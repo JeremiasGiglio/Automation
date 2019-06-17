@@ -1,0 +1,9 @@
+
+.cypress.json
+/Cypress/cypress
+/Cypress/fixtures
+/Cypress/plugins
+/Cypress/support
+/Cypress.json
+/Cypress/integration/examples
+/Cypress/cypress.json
