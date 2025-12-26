@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Asistente de rompecabezas deslizante</title>
+  <style>
+    :root {
+      --accent: #2ca58d;
+      --frame: #5f5f5f;
+      --hint: #ffc107;
+      --bg: #0f1116;
+      --grid-size: 4;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, #1c2230, #0f1116 50%);
+      color: #f4f6fb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    main {
+      background: #1a1f2a;
+      border: 1px solid #2f3748;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+      width: min(1100px, 100%);
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-weight: 800;
+      font-size: 1.6rem;
+      letter-spacing: 0.02em;
+    }
+
+    .tag {
+      background: rgba(44, 165, 141, 0.15);
+      color: #7de0cb;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      border: 1px solid rgba(44, 165, 141, 0.4);
+    }
+
+    .board-shell {
+      background: linear-gradient(135deg, #5d626d, #2f323a 45%, #1b1f26);
+      border-radius: 12px;
+      padding: 16px;
+      border: 4px solid var(--frame);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(60px, 1fr));
+      grid-template-rows: repeat(4, minmax(60px, 1fr));
+      gap: 4px;
+      background: #10141d;
+      border-radius: 8px;
+      padding: 4px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      aspect-ratio: 1 / 1;
+      width: 100%;
+    }
+
+    .tile {
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.4rem;
+      background: linear-gradient(145deg, #2a3040, #171b24);
+      color: #cfd6e6;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      position: relative;
+      user-select: none;
+    }
+
+    .tile:active { transform: scale(0.98); }
+
+    .tile.hint {
+      box-shadow: 0 0 0 3px var(--hint), 0 10px 20px rgba(255, 193, 7, 0.3);
+      border-color: var(--hint);
+      color: #1f1300;
+      background: linear-gradient(145deg, #ffd54f, #ffb300);
+    }
+
+    .tile.blank {
+      background: repeating-linear-gradient(135deg, #0f1116, #0f1116 8px, #1c2029 8px, #1c2029 16px);
+      border: 1px dashed rgba(255, 255, 255, 0.16);
+      color: #ff6b6b;
+      font-size: 2rem;
+      letter-spacing: 1px;
+    }
+
+    .controls, .status, .help {
+      background: #0f131b;
+      border: 1px solid #2a3142;
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .controls h2, .status h2, .help h2 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1.05rem;
+      letter-spacing: 0.01em;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    button {
+      background: var(--accent);
+      color: #08120f;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 100ms ease, box-shadow 100ms ease, filter 100ms ease;
+      box-shadow: 0 8px 16px rgba(44, 165, 141, 0.2);
+    }
+
+    button.secondary {
+      background: transparent;
+      color: #d8deed;
+      border: 1px solid #3a4255;
+      box-shadow: none;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    label { font-size: 0.95rem; color: #c3c9d7; }
+
+    textarea {
+      width: 100%;
+      min-height: 76px;
+      background: #10141d;
+      border: 1px solid #2a3142;
+      border-radius: 8px;
+      color: #e3e8f2;
+      padding: 8px;
+      resize: vertical;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    }
+
+    .status strong { color: #9dd7ff; }
+    .status p { margin: 6px 0; }
+    .badge {
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.08);
+      display: inline-block;
+    }
+
+    .hint-text { color: #ffd54f; font-weight: 700; }
+    .warn { color: #ff6b6b; font-weight: 700; }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    ul.tips { margin: 4px 0 0; padding-left: 18px; color: #cfd6e6; }
+
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+      .board-shell { order: 2; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Asistente de rompecabezas deslizante (15-puzzle)</h1>
+        <p style="margin:4px 0 0; color:#cfd6e6">Replica el tablero: la casilla con <strong>X</strong> es el hueco. Cada pista resalta la ficha que debes mover para acercarte a la solución.</p>
+      </div>
+      <span class="tag">Pista automática</span>
+    </header>
+
+    <div class="board-shell">
+      <div id="board" class="board" aria-label="tablero de rompecabezas"></div>
+    </div>
+
+    <div class="controls">
+      <h2>Configuración y acciones</h2>
+      <div class="actions">
+        <button id="shuffle">Barajar con solución</button>
+        <button id="reset" class="secondary">Resolver instantáneo</button>
+        <button id="playSolution" class="secondary">Reproducir pista</button>
+      </div>
+
+      <div>
+        <label for="boardInput">Pega aquí tu tablero (usa 0 o X para el hueco, 16 valores):</label>
+        <textarea id="boardInput" spellcheck="false">1 2 3 4
+5 6 7 8
+9 10 11 12
+13 14 15 0</textarea>
+      </div>
+      <div class="actions">
+        <button id="loadBoard">Aplicar tablero</button>
+        <button id="copyBoard" class="secondary">Copiar tablero actual</button>
+        <button id="sample" class="secondary">Usar mezcla de ejemplo</button>
+      </div>
+    </div>
+
+    <div class="status">
+      <h2>Estado y pistas</h2>
+      <p><strong>Próximo movimiento:</strong> <span id="hintMove" class="hint-text">calculando...</span></p>
+      <p><strong>Longitud de la ruta:</strong> <span id="pathLength" class="badge">-</span></p>
+      <p><strong>Mensaje:</strong> <span id="statusText">-</span></p>
+      <p><strong>Secuencia de movimientos:</strong> <span id="pathPreview" style="display:block;word-break:break-word;color:#b8c3d6">-</span></p>
+    </div>
+
+    <div class="help">
+      <h2>Cómo usarlo</h2>
+      <ul class="tips">
+        <li>Haz clic en la ficha resaltada (amarillo) para seguir la pista. El hueco está marcado con <strong>X</strong>.</li>
+        <li>Si quieres copiar tu tablero del juego, escribe los números de izquierda a derecha y de arriba abajo. Usa 0 o X para el espacio vacío.</li>
+        <li>"Barajar con solución" mezcla el tablero manteniendo la resolubilidad; "Reproducir pista" ejecuta la ruta sugerida paso a paso.</li>
+      </ul>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+
+    const size = 4;
+    const goal = Array.from({ length: size * size }, (_, idx) => (idx === size * size - 1 ? 0 : idx + 1));
+    let board = [...goal];
+    let cachedSolution = null;
+    let autoplayTimer = null;
+
+    const boardEl = document.getElementById("board");
+    const hintMoveEl = document.getElementById("hintMove");
+    const pathLengthEl = document.getElementById("pathLength");
+    const statusTextEl = document.getElementById("statusText");
+    const pathPreviewEl = document.getElementById("pathPreview");
+    const boardInput = document.getElementById("boardInput");
+
+    document.getElementById("shuffle").addEventListener("click", () => {
+      board = shuffleSolvable();
+      refresh();
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      stopAutoplay();
+      board = [...goal];
+      refresh();
+    });
+
+    document.getElementById("loadBoard").addEventListener("click", () => {
+      const parsed = parseBoard(boardInput.value);
+      if (!parsed.ok) {
+        statusTextEl.textContent = parsed.error;
+        statusTextEl.classList.add("warn");
+        return;
+      }
+      statusTextEl.classList.remove("warn");
+      board = parsed.state;
+      refresh();
+    });
+
+    document.getElementById("copyBoard").addEventListener("click", async () => {
+      const snapshot = serialize(board).replace(/,/g, " ");
+      await navigator.clipboard.writeText(snapshot);
+      statusTextEl.textContent = "Tablero copiado al portapapeles.";
+      statusTextEl.classList.remove("warn");
+    });
+
+    document.getElementById("sample").addEventListener("click", () => {
+      board = [
+        5, 1, 3, 4,
+        2, 7, 6, 8,
+        9, 10, 11, 12,
+        13, 0, 15, 14,
+      ];
+      refresh();
+    });
+
+    document.getElementById("playSolution").addEventListener("click", () => {
+      if (!cachedSolution || !cachedSolution.path) {
+        statusTextEl.textContent = "No hay pista disponible aún.";
+        statusTextEl.classList.add("warn");
+        return;
+      }
+      stopAutoplay();
+      autoplayTimer = playPath(cachedSolution.path);
+    });
+
+    function stopAutoplay() {
+      if (autoplayTimer) {
+        clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+    }
+
+    function parseBoard(text) {
+      const tokens = text.trim().split(/[\s,;]+/).filter(Boolean);
+      if (tokens.length !== size * size) {
+        return { ok: false, error: "Debes ingresar exactamente 16 valores." };
+      }
+      const values = tokens.map((token) => {
+        const normalized = token.trim().toLowerCase();
+        if (normalized === "x") return 0;
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : NaN;
+      });
+      if (values.some((n) => Number.isNaN(n))) {
+        return { ok: false, error: "Usa números 0-15 o la letra X para el hueco." };
+      }
+      const unique = new Set(values);
+      if (unique.size !== size * size) {
+        return { ok: false, error: "Los valores no pueden repetirse." };
+      }
+      const outOfRange = values.some((n) => n < 0 || n > 15);
+      if (outOfRange) {
+        return { ok: false, error: "Solo se permiten valores entre 0 y 15." };
+      }
+      return { ok: true, state: values };
+    }
+
+    function shuffleSolvable() {
+      // Mezcla aplicando movimientos válidos desde el objetivo para mantener la resolubilidad.
+      let state = [...goal];
+      let zero = state.indexOf(0);
+      const steps = 80;
+      for (let i = 0; i < steps; i += 1) {
+        const options = neighbors(zero);
+        const choice = options[Math.floor(Math.random() * options.length)];
+        state[zero] = state[choice];
+        state[choice] = 0;
+        zero = choice;
+      }
+      return state;
+    }
+
+    function neighbors(index) {
+      const row = Math.floor(index / size);
+      const col = index % size;
+      const result = [];
+      if (row > 0) result.push(index - size);
+      if (row < size - 1) result.push(index + size);
+      if (col > 0) result.push(index - 1);
+      if (col < size - 1) result.push(index + 1);
+      return result;
+    }
+
+    function serialize(state) { return state.join(","); }
+    function deserialize(key) { return key.split(",").map((x) => Number(x)); }
+
+    function isSolved(state) { return serialize(state) === serialize(goal); }
+
+    function manhattan(state) {
+      let total = 0;
+      for (let i = 0; i < state.length; i += 1) {
+        const value = state[i];
+        if (value === 0) continue;
+        const target = value - 1;
+        const currentRow = Math.floor(i / size);
+        const currentCol = i % size;
+        const targetRow = Math.floor(target / size);
+        const targetCol = target % size;
+        total += Math.abs(currentRow - targetRow) + Math.abs(currentCol - targetCol);
+      }
+      return total;
+    }
+
+    function isSolvable(state) {
+      const inversions = state
+        .filter((n) => n !== 0)
+        .reduce((acc, value, idx, arr) => {
+          const later = arr.slice(idx + 1).filter((n) => n !== 0 && n < value).length;
+          return acc + later;
+        }, 0);
+      const rowFromBottom = size - Math.floor(state.indexOf(0) / size);
+      if (size % 2 !== 0) {
+        return inversions % 2 === 0;
+      }
+      const blankIsEvenRow = rowFromBottom % 2 === 0;
+      return blankIsEvenRow ? inversions % 2 !== 0 : inversions % 2 === 0;
+    }
+
+    class MinHeap {
+      constructor(compare) {
+        this.data = [];
+        this.compare = compare;
+      }
+      push(item) {
+        this.data.push(item);
+        this.bubbleUp(this.data.length - 1);
+      }
+      pop() {
+        if (this.data.length === 0) return undefined;
+        const top = this.data[0];
+        const end = this.data.pop();
+        if (this.data.length > 0 && end !== undefined) {
+          this.data[0] = end;
+          this.bubbleDown(0);
+        }
+        return top;
+      }
+      bubbleUp(idx) {
+        const element = this.data[idx];
+        while (idx > 0) {
+          const parentIdx = Math.floor((idx - 1) / 2);
+          const parent = this.data[parentIdx];
+          if (this.compare(element, parent) >= 0) break;
+          this.data[parentIdx] = element;
+          this.data[idx] = parent;
+          idx = parentIdx;
+        }
+      }
+      bubbleDown(idx) {
+        const length = this.data.length;
+        const element = this.data[idx];
+        while (true) {
+          const leftIdx = 2 * idx + 1;
+          const rightIdx = 2 * idx + 2;
+          let smallest = idx;
+          if (leftIdx < length && this.compare(this.data[leftIdx], this.data[smallest]) < 0) {
+            smallest = leftIdx;
+          }
+          if (rightIdx < length && this.compare(this.data[rightIdx], this.data[smallest]) < 0) {
+            smallest = rightIdx;
+          }
+          if (smallest === idx) break;
+          this.data[idx] = this.data[smallest];
+          this.data[smallest] = element;
+          idx = smallest;
+        }
+      }
+      get size() { return this.data.length; }
+    }
+
+    function solveWithAStar(startState) {
+      const startKey = serialize(startState);
+      const frontier = new MinHeap((a, b) => a.f - b.f);
+      const gScore = new Map([[startKey, 0]]);
+      const cameFrom = new Map();
+      const visited = new Set();
+      frontier.push({ key: startKey, f: manhattan(startState), zero: startState.indexOf(0) });
+      const maxNodes = 150000;
+      let explored = 0;
+
+      while (frontier.size > 0) {
+        const current = frontier.pop();
+        explored += 1;
+        if (explored > maxNodes) return { path: null, explored, limit: true };
+        if (visited.has(current.key)) continue;
+        visited.add(current.key);
+        if (current.key === serialize(goal)) {
+          return { path: reconstruct(cameFrom, current.key), explored, limit: false };
+        }
+
+        const state = deserialize(current.key);
+        const zeroIndex = state.indexOf(0);
+        for (const nIdx of neighbors(zeroIndex)) {
+          const nextState = [...state];
+          [nextState[zeroIndex], nextState[nIdx]] = [nextState[nIdx], nextState[zeroIndex]];
+          const key = serialize(nextState);
+          const tentativeG = (gScore.get(current.key) ?? Infinity) + 1;
+          if (tentativeG < (gScore.get(key) ?? Infinity)) {
+            cameFrom.set(key, { prev: current.key, moved: state[nIdx] });
+            gScore.set(key, tentativeG);
+            const fScore = tentativeG + manhattan(nextState);
+            frontier.push({ key, f: fScore });
+          }
+        }
+      }
+      return { path: null, explored, limit: false };
+    }
+
+    function reconstruct(cameFrom, currentKey) {
+      const moves = [];
+      let key = currentKey;
+      while (cameFrom.has(key)) {
+        const step = cameFrom.get(key);
+        moves.push(step.moved);
+        key = step.prev;
+      }
+      return moves.reverse();
+    }
+
+    function computeHint(state) {
+      if (!isSolvable(state)) {
+        return { message: "El tablero no es resoluble (paridad).", path: null };
+      }
+      if (isSolved(state)) {
+        return { message: "¡Ya está resuelto!", path: [] };
+      }
+      const solution = solveWithAStar(state);
+      if (solution.limit) {
+        return { message: "La búsqueda superó el límite de nodos.", path: null };
+      }
+      if (!solution.path) {
+        return { message: "No se encontró solución.", path: null };
+      }
+      return { message: `Ruta encontrada (nodos explorados: ${solution.explored}).`, path: solution.path };
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      const hintTile = cachedSolution && cachedSolution.path && cachedSolution.path.length ? cachedSolution.path[0] : null;
+      board.forEach((value, idx) => {
+        const tile = document.createElement("div");
+        tile.classList.add("tile");
+        tile.dataset.index = idx.toString();
+        if (value === 0) {
+          tile.classList.add("blank");
+          tile.textContent = "X";
+        } else {
+          tile.textContent = value.toString();
+          if (hintTile === value) tile.classList.add("hint");
+        }
+        tile.addEventListener("click", () => tryMove(idx));
+        boardEl.appendChild(tile);
+      });
+    }
+
+    function tryMove(index) {
+      const zeroIndex = board.indexOf(0);
+      if (!neighbors(zeroIndex).includes(index)) return;
+      [board[zeroIndex], board[index]] = [board[index], board[zeroIndex]];
+      refresh();
+    }
+
+    function refresh() {
+      stopAutoplay();
+      cachedSolution = computeHint(board);
+      renderBoard();
+      updateStatus();
+      boardInput.value = serialize(board).replace(/,/g, " ");
+    }
+
+    function updateStatus() {
+      if (!cachedSolution || !cachedSolution.path) {
+        hintMoveEl.textContent = "sin pista";
+        pathLengthEl.textContent = "-";
+        statusTextEl.textContent = cachedSolution ? cachedSolution.message : "-";
+        statusTextEl.classList.add("warn");
+        pathPreviewEl.textContent = "-";
+        return;
+      }
+      statusTextEl.textContent = cachedSolution.message;
+      statusTextEl.classList.remove("warn");
+      const [firstMove, ...rest] = cachedSolution.path;
+      hintMoveEl.textContent = firstMove !== undefined ? `Mueve la ficha ${firstMove}` : "Ya está resuelto";
+      pathLengthEl.textContent = cachedSolution.path.length.toString();
+      pathPreviewEl.textContent = cachedSolution.path.join(" → ") || "Ningún paso pendiente";
+    }
+
+    function playPath(moves) {
+      if (!moves || !moves.length) return null;
+      let step = 0;
+      return setInterval(() => {
+        if (step >= moves.length) {
+          stopAutoplay();
+          return;
+        }
+        const tileValue = moves[step];
+        const tileIndex = board.indexOf(tileValue);
+        const zeroIndex = board.indexOf(0);
+        if (neighbors(zeroIndex).includes(tileIndex)) {
+          [board[zeroIndex], board[tileIndex]] = [board[tileIndex], board[zeroIndex]];
+        }
+        step += 1;
+        cachedSolution = computeHint(board);
+        renderBoard();
+        updateStatus();
+      }, 250);
+    }
+
+    // Inicializa con una mezcla resoluble.
+    board = shuffleSolvable();
+    refresh();
+  </script>
+</body>
+</html>
